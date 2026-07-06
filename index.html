@@ -77,6 +77,106 @@ body{
   color:var(--text-dim);
   font-family:var(--font-mono);
 }
+.about-btn{
+  margin-left:auto;
+  background:var(--panel-alt);
+  border:1px solid var(--border);
+  color:var(--text-dim);
+  padding:6px 14px;
+  border-radius:999px;
+  font-size:12px;
+  font-family:var(--font-mono);
+  cursor:pointer;
+  transition:all .15s ease;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.about-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+.modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(5,7,12,0.65);
+  backdrop-filter:blur(2px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:1000;
+}
+.modal-overlay[hidden]{display:none;}
+.modal-box{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:26px 28px;
+  width:320px;
+  max-width:90vw;
+  text-align:center;
+  box-shadow:0 10px 40px rgba(0,0,0,0.5);
+  position:relative;
+}
+.modal-box .logo-dot{
+  width:12px;height:12px;border-radius:50%;
+  background:var(--accent);
+  box-shadow:0 0 12px var(--accent);
+  display:inline-block;
+  margin-bottom:14px;
+}
+.modal-box h2{
+  font-family:var(--font-display);
+  font-size:16px;
+  margin:0 0 14px 0;
+}
+.modal-box p{
+  font-size:13px;
+  color:var(--text-dim);
+  margin:6px 0;
+  line-height:1.6;
+}
+.modal-box p.credit-label{
+  font-size:11px;
+  color:var(--text-faint);
+  font-family:var(--font-mono);
+  letter-spacing:0.5px;
+  text-transform:uppercase;
+  margin-top:16px;
+}
+.modal-box p.credit-value{
+  font-size:14px;
+  color:var(--text);
+  font-weight:600;
+}
+.modal-close{
+  position:absolute;
+  top:10px; right:12px;
+  background:none;
+  border:none;
+  color:var(--text-faint);
+  font-size:16px;
+  cursor:pointer;
+  line-height:1;
+  padding:4px;
+}
+.modal-close:hover{color:var(--accent);}
+
+.tone-select-wrap{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-right:4px;
+}
+.tone-select-wrap span.lbl{
+  font-size:11.5px;
+  color:var(--text-dim);
+  font-family:var(--font-mono);
+  white-space:nowrap;
+}
+.tone-select-wrap select{
+  width:auto;
+  padding:6px 8px;
+  font-size:12px;
+}
 
 /* ---------- メインレイアウト（左:設定 / 右:プレビュー） ---------- */
 .main{
@@ -430,8 +530,21 @@ canvas.roll{
 <header class="app-header">
   <span class="logo-dot"></span>
   <h1>Miku MIDI Phrase Pack Generator</h1>
-  <span class="subtitle">SMF Format0 / 120PPQ / Key=C / Tempo=120</span>
+  <span class="subtitle">SMF Format0 / 120PPQ</span>
+  <button class="about-btn" id="btn-about" title="About">ℹ about</button>
 </header>
+
+<div class="modal-overlay" id="about-modal" hidden>
+  <div class="modal-box">
+    <button class="modal-close" id="btn-about-close" title="閉じる">✕</button>
+    <span class="logo-dot"></span>
+    <h2>Miku MIDI Phrase Pack Generator</h2>
+    <p class="credit-label">Created by</p>
+    <p class="credit-value">TK Music Lab</p>
+    <p class="credit-label">Author</p>
+    <p class="credit-value">Shevatyl</p>
+  </div>
+</div>
 
 <div class="main">
 
@@ -457,9 +570,10 @@ canvas.roll{
     </div>
 
     <div class="section">
-      <h3>④ キー（移調）</h3>
-      <select id="key-select"></select>
-      <p class="hint">スケールは常にメジャースケール。ここでは全体を半音単位で移調します。</p>
+      <h3>④ キー・スケール</h3>
+      <select id="key-select" style="margin-bottom:8px;"></select>
+      <select id="scale-select"></select>
+      <p class="hint">選択したキー・スケールに応じて、メロディとコードの構成音（ダイアトニックコード）が自動的に正しく算出されます。</p>
     </div>
 
     <div class="section">
@@ -488,9 +602,19 @@ canvas.roll{
       <h3>⑦ ランダム性（Seed）</h3>
       <div class="seed-row">
         <input type="text" id="seed-input" placeholder="例: miku2026" value="miku2026">
-        <label class="toggle-inline"><input type="checkbox" id="seed-fixed" checked> Seed固定</label>
+        <label class="toggle-inline"><input type="checkbox" id="seed-fixed"> Seed固定</label>
       </div>
       <p class="hint">Seedを固定すると同じ設定から常に同じメロディ群が再生成されます。チェックを外すと毎回ランダムです。</p>
+    </div>
+
+    <div class="section">
+      <h3>⑧ テンポ</h3>
+      <div class="slider-row">
+        <span class="label">Tempo</span>
+        <input type="range" min="60" max="200" value="120" id="tempo-slider">
+        <span class="val" id="tempo-slider-val">120</span>
+      </div>
+      <p class="hint">生成されるMIDIファイルの再生テンポ（BPM）です。試聴の再生速度にも反映されます。</p>
     </div>
 
   </aside>
@@ -504,9 +628,20 @@ canvas.roll{
           <div class="preview-title" id="preview-title">プレビュー待機中</div>
           <div class="preview-tags" id="preview-tags"></div>
         </div>
-        <div class="transport">
-          <button id="btn-play" title="再生">▶</button>
-          <button id="btn-stop" title="停止" disabled>■</button>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="tone-select-wrap">
+            <span class="lbl">音色</span>
+            <select id="tone-select">
+              <option value="original">オリジナル</option>
+              <option value="dark">ダーク</option>
+              <option value="whisper">ウィスパー</option>
+            </select>
+          </div>
+          <label class="toggle-inline"><input type="checkbox" id="chord-playback-toggle"> コード再生</label>
+          <div class="transport">
+            <button id="btn-play" title="再生">▶</button>
+            <button id="btn-stop" title="停止" disabled>■</button>
+          </div>
         </div>
       </div>
       <canvas class="roll" id="piano-roll"></canvas>
@@ -580,18 +715,31 @@ const DURATION_NAMES = ['whole', 'half', 'quarter', 'eighth', 'sixteenth'];
 // 度数: C D E F G A B
 const SCALE_STEPS = [0, 2, 4, 5, 7, 9, 11];
 
-// ダイアトニックコード（トライアド）の構成音を「Cから見た半音オフセット」で表現。
-// C majorのダイアトニックコードはすべてスケール構成音のみで出来ているため、
-// 「スケール上の音」かつ「コード構成音の集合に含まれるか」だけで判定できる。
-const CHORD_TONES = {
-  'I':   [0, 4, 7],   // C  E  G
-  'ii':  [2, 5, 9],   // D  F  A
-  'iii': [4, 7, 11],  // E  G  B
-  'IV':  [5, 9, 0],   // F  A  C
-  'V':   [7, 11, 2],  // G  B  D
-  'vi':  [9, 0, 4]    // A  C  E
+// 選択可能なスケール定義（度数0〜6の半音オフセット、Cルート基準）
+const SCALE_DEFS = {
+  major:          { steps: [0, 2, 4, 5, 7, 9, 11], ja: 'メジャー（Ionian）' },
+  natural_minor:  { steps: [0, 2, 3, 5, 7, 8, 10], ja: 'ナチュラルマイナー（Aeolian）' },
+  harmonic_minor: { steps: [0, 2, 3, 5, 7, 8, 11], ja: 'ハーモニックマイナー' },
+  dorian:         { steps: [0, 2, 3, 5, 7, 9, 10], ja: 'ドリアン' },
+  mixolydian:     { steps: [0, 2, 4, 5, 7, 9, 10], ja: 'ミクソリディアン' }
 };
-const CHORD_NAMES = ['I', 'ii', 'iii', 'IV', 'V', 'vi'];
+const SCALE_IDS = ['major', 'natural_minor', 'harmonic_minor', 'dorian', 'mixolydian'];
+
+// ダイアトニックコード（トライアド）は選択されたスケールの度数から3度堆積で動的に算出する。
+// CHORD_NAMESは度数ラベル（I=1度, ii=2度...）で、スケールが変わっても共通して使い回せる。
+const CHORD_NAMES = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii'];
+const CHORD_DEGREE_INDEX = { 'I': 0, 'ii': 1, 'iii': 2, 'IV': 3, 'V': 4, 'vi': 5, 'vii': 6 };
+
+// 指定スケールの度数idx(0-6)から3度堆積のトライアド構成音（半音オフセット、Cルート基準）を得る
+function getChordTonesForDegree(scaleSteps, degreeIndex) {
+  const idx = degreeIndex % 7;
+  const thirdIdx = (idx + 2) % 7;
+  const fifthIdx = (idx + 4) % 7;
+  const root = scaleSteps[idx];
+  const third = scaleSteps[thirdIdx] + (thirdIdx < idx ? 12 : 0);
+  const fifth = scaleSteps[fifthIdx] + (fifthIdx < idx ? 12 : 0);
+  return [root, third, fifth];
+}
 
 // 固定コード進行プリセット（J-POP/ボカロ曲でよく使われる進行を用意）
 const CHORD_PRESETS = {
@@ -684,15 +832,19 @@ function hashStringToSeed(str) {
 function MOD(n, m) { return ((n % m) + m) % m; }
 
 // 指定キーにおけるスケール構成音のpitch class集合
-function scalePCs(keyOffset) {
+function scalePCs(keyOffset, scaleSteps) {
+  const steps = scaleSteps || SCALE_DEFS.major.steps;
   const s = new Set();
-  SCALE_STEPS.forEach(v => s.add(MOD(v + keyOffset, 12)));
+  steps.forEach(v => s.add(MOD(v + keyOffset, 12)));
   return s;
 }
 // 指定キー・コードにおけるコードトーンのpitch class集合
-function chordPCs(chordName, keyOffset) {
+function chordPCs(chordName, keyOffset, scaleSteps) {
+  const steps = scaleSteps || SCALE_DEFS.major.steps;
+  const degreeIndex = CHORD_DEGREE_INDEX[chordName] !== undefined ? CHORD_DEGREE_INDEX[chordName] : 0;
+  const tones = getChordTonesForDegree(steps, degreeIndex);
   const s = new Set();
-  CHORD_TONES[chordName].forEach(v => s.add(MOD(v + keyOffset, 12)));
+  tones.forEach(v => s.add(MOD(v + keyOffset, 12)));
   return s;
 }
 
@@ -706,14 +858,14 @@ function nearestInSet(pitch, set) {
   return pitch;
 }
 // pitchをスケール上の最寄りの音にスナップする
-function snapToScale(pitch, keyOffset) {
-  return nearestInSet(pitch, scalePCs(keyOffset));
+function snapToScale(pitch, keyOffset, scaleSteps) {
+  return nearestInSet(pitch, scalePCs(keyOffset, scaleSteps));
 }
 
 // pitchから「ダイアトニックで count 度」動いた音を返す（順次進行の基本単位）。
 // count>0で上行、count<0で下行。半音単位で1つずつ動かしながらスケール上の音まで進める。
-function stepScale(pitch, count, keyOffset) {
-  const set = scalePCs(keyOffset);
+function stepScale(pitch, count, keyOffset, scaleSteps) {
+  const set = scalePCs(keyOffset, scaleSteps);
   let p = pitch;
   const dir = count >= 0 ? 1 : -1;
   const n = Math.abs(count);
@@ -773,8 +925,8 @@ function generateMotif(rng) {
  * variant: 'none'(反復=A) / 'invert'(音程を反転=A') / 'shift'(度数を少しずらす=A')
  * 常にlow〜highの音域内にクランプしながら配置する。
  */
-function placeMotif(motif, startPitch, chord, keyOffset, tickOffset, notesOut, styleCfg, rng, variant, low, high) {
-  let cur = nearestInSet(startPitch, chordPCs(chord, keyOffset));
+function placeMotif(motif, startPitch, chord, keyOffset, tickOffset, notesOut, styleCfg, rng, variant, low, high, scaleSteps) {
+  let cur = nearestInSet(startPitch, chordPCs(chord, keyOffset, scaleSteps));
   while (cur < low) cur += 12;
   while (cur > high) cur -= 12;
   let t = tickOffset;
@@ -783,7 +935,7 @@ function placeMotif(motif, startPitch, chord, keyOffset, tickOffset, notesOut, s
     if (variant === 'invert') steps = -steps;
     if (variant === 'shift' && i > 0) steps += (rng() < 0.5 ? 1 : -1);
     if (i > 0) {
-      cur = stepScale(cur, steps, keyOffset);
+      cur = stepScale(cur, steps, keyOffset, scaleSteps);
       while (cur < low) cur += 12;
       while (cur > high) cur -= 12;
     }
@@ -899,12 +1051,12 @@ function pickClimaxBar(bars, rng) {
   if (bars <= 4) return bars - 2;
   return 4 + Math.floor(rng() * 2); // 8小節なら5〜6小節目付近
 }
-function pickClimaxPitch(range, keyOffset, rng) {
+function pickClimaxPitch(range, keyOffset, rng, scaleSteps) {
   const [lo, hi] = range;
   const target = lo + Math.floor(rng() * (hi - lo + 1));
-  return snapToScale(target, keyOffset);
+  return snapToScale(target, keyOffset, scaleSteps);
 }
-function applyClimax(notes, profile, keyOffset, rng, climaxBarIndex, maxClimax) {
+function applyClimax(notes, profile, keyOffset, rng, climaxBarIndex, maxClimax, scaleSteps) {
   if (!profile.climax || !notes.length || maxClimax <= 0) return;
   const barStart = climaxBarIndex * TICKS_PER_BAR;
   const barEnd = barStart + TICKS_PER_BAR;
@@ -916,7 +1068,7 @@ function applyClimax(notes, profile, keyOffset, rng, climaxBarIndex, maxClimax) 
   let used = 0;
   for (const note of candidates) {
     if (used >= maxClimax) break;
-    note.pitch = pickClimaxPitch(profile.climaxRange, keyOffset, rng);
+    note.pitch = pickClimaxPitch(profile.climaxRange, keyOffset, rng, scaleSteps);
     note.velocity = Math.min(127, note.velocity + 12);
     used++;
   }
@@ -929,6 +1081,7 @@ function applyClimax(notes, profile, keyOffset, rng, climaxBarIndex, maxClimax) 
  */
 function generateMelody(cfg) {
   const { bars, phraseType, style, keyOffset, rng } = cfg;
+  const scaleSteps = cfg.scaleSteps || SCALE_DEFS.major.steps;
   const profile = PHRASE_RANGE[phraseType];
   const styleCfg = STYLE_CONFIG[style];
 
@@ -941,8 +1094,8 @@ function generateMelody(cfg) {
   const motif = generateMotif(rng);
 
   // 開始音：音域の中心付近をスケール・コードトーンにスナップして自然に入る
-  let current = snapToScale(Math.round((low + high) / 2), keyOffset);
-  current = nearestInSet(current, chordPCs(progression[0], keyOffset));
+  let current = snapToScale(Math.round((low + high) / 2), keyOffset, scaleSteps);
+  current = nearestInSet(current, chordPCs(progression[0], keyOffset, scaleSteps));
 
   const notes = [];
   let tick = 0;
@@ -957,7 +1110,7 @@ function generateMelody(cfg) {
     // --- モチーフ配置（A / A2 のときのみ。Bは自由生成に任せて対比を作る） ---
     if (label === 'A' || label === 'A2') {
       const variant = label === 'A2' ? (rng() < 0.5 ? 'invert' : 'shift') : 'none';
-      const res = placeMotif(motif, current, chord, keyOffset, tick, notes, styleCfg, rng, variant, low, high);
+      const res = placeMotif(motif, current, chord, keyOffset, tick, notes, styleCfg, rng, variant, low, high, scaleSteps);
       tick += res.ticksUsed;
       barTicksRemaining -= res.ticksUsed;
       current = res.endPitch;
@@ -976,7 +1129,7 @@ function generateMelody(cfg) {
 
       if (isPhraseFinalNote) {
         // 自然な着地：最終コードのコードトーンへ
-        pitch = nearestInSet(current, chordPCs(chord, keyOffset));
+        pitch = nearestInSet(current, chordPCs(chord, keyOffset, scaleSteps));
       } else {
         const r = rng();
         if (r < styleCfg.repeatProb) {
@@ -985,20 +1138,20 @@ function generateMelody(cfg) {
         } else if (r < styleCfg.repeatProb + styleCfg.leapProb) {
           // コードトーンへの跳躍（3度〜5度程度、歌いやすい範囲に制限）
           const stepsCount = (2 + Math.floor(rng() * 3)) * (rng() < 0.5 ? 1 : -1);
-          pitch = nearestInSet(stepScale(current, stepsCount, keyOffset), chordPCs(chord, keyOffset));
+          pitch = nearestInSet(stepScale(current, stepsCount, keyOffset, scaleSteps), chordPCs(chord, keyOffset, scaleSteps));
           prevDir = stepsCount > 0 ? 1 : -1;
         } else if (rng() < (styleCfg.octaveLeapProb || 0)) {
           // オクターブ跳躍（低確率）
-          pitch = nearestInSet(current + (rng() < 0.5 ? 12 : -12), chordPCs(chord, keyOffset));
+          pitch = nearestInSet(current + (rng() < 0.5 ? 12 : -12), chordPCs(chord, keyOffset, scaleSteps));
         } else {
           // 基本：順次進行（1〜2度）。モメンタムを保ちつつ稀に方向転換。
           const dir = (rng() < 0.75) ? prevDir : -prevDir;
           const steps = (rng() < 0.25) ? 2 : 1;
-          pitch = stepScale(current, dir * steps, keyOffset);
+          pitch = stepScale(current, dir * steps, keyOffset, scaleSteps);
           prevDir = dir;
         }
         // 強拍ではコードトーンに寄せる（適度なコードトーン使用）
-        if (strongBeat && rng() < 0.5) pitch = nearestInSet(pitch, chordPCs(chord, keyOffset));
+        if (strongBeat && rng() < 0.5) pitch = nearestInSet(pitch, chordPCs(chord, keyOffset, scaleSteps));
       }
 
       // 音域内へクランプ（オクターブ単位のシフトなのでスケール/コードトーン適合は維持される）
@@ -1017,14 +1170,14 @@ function generateMelody(cfg) {
   if (profile.climax) {
     const climaxBarIndex = pickClimaxBar(bars, rng);
     const maxClimax = phraseType === 'Hook' ? 1 : (rng() < 0.5 ? 1 : 2);
-    applyClimax(notes, profile, keyOffset, rng, climaxBarIndex, maxClimax);
+    applyClimax(notes, profile, keyOffset, rng, climaxBarIndex, maxClimax, scaleSteps);
   }
 
   // --- 最終着地の再確認（クライマックス処理後にズレていないか） ---
   if (notes.length) {
     const last = notes[notes.length - 1];
     const lastChord = progression[bars - 1];
-    last.pitch = nearestInSet(last.pitch, chordPCs(lastChord, keyOffset));
+    last.pitch = nearestInSet(last.pitch, chordPCs(lastChord, keyOffset, scaleSteps));
     while (last.pitch < low) last.pitch += 12;
     while (last.pitch > high) last.pitch -= 12;
   }
@@ -1118,7 +1271,9 @@ const state = {
   playToken: 0,
   audioCtx: null,
   activeNodes: [],
-  playheadRAF: null
+  playheadRAF: null,
+  tone: 'original',   // 試聴音色: 'original' / 'dark' / 'whisper'
+  noiseBuffer: null   // ウィスパー音色用のホワイトノイズバッファ（遅延生成してキャッシュ）
 };
 
 
@@ -1132,6 +1287,18 @@ function ensureAudioCtx() {
     state.audioCtx = new Ctx();
   }
   return state.audioCtx;
+}
+
+// ウィスパー音色用：ホワイトノイズバッファを一度だけ生成してキャッシュする
+function getNoiseBuffer(ctx) {
+  if (state.noiseBuffer && state.noiseBuffer._ctx === ctx) return state.noiseBuffer;
+  const len = ctx.sampleRate * 2; // 2秒分をループ再生
+  const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+  buffer._ctx = ctx;
+  state.noiseBuffer = buffer;
+  return buffer;
 }
 
 function stopPlayback() {
@@ -1148,25 +1315,102 @@ function stopPlayback() {
   redrawCurrentRoll(null);
 }
 
-function playNotes(notes) {
-  stopPlayback();
-  if (!notes || !notes.length) return;
-  const ctx = ensureAudioCtx();
-  if (ctx.state === 'suspended') ctx.resume();
-  const myToken = ++state.playToken;
-  const secPerTick = 60 / (120 * PPQ); // テンポ120固定
-  const startTime = ctx.currentTime + 0.08;
-  let maxEnd = 0;
+// 音色ごとのノート1つ分の音声グラフを組み立てる。
+// tone: 'original'(サイン+ビブラート) / 'dark'(ノコギリ波寄り・低め・重め) / 'whisper'(息成分多めの静かな声)
+function buildVoiceForNote(ctx, n, t0, t1, dur, tone) {
+  const freq = 440 * Math.pow(2, (n.pitch - 69) / 12);
+  const attack = Math.min(0.02, dur * 0.25);
+  const release = Math.min(0.09, dur * 0.35);
+  const nodes = [];
 
-  notes.forEach(n => {
-    const t0 = startTime + n.startTick * secPerTick;
-    const dur = Math.max(0.03, n.durTicks * secPerTick);
-    const t1 = t0 + dur;
-    maxEnd = Math.max(maxEnd, t1);
+  if (tone === 'dark') {
+    // ダーク：三角波+ノコギリ波を混ぜて倍音を厚くし、フィルタを絞って暗い音色に。ビブラートは深め・やや遅い。
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(freq, t0);
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(freq / 2, t0); // オクターブ下を薄く重ねて厚みを出す
 
-    const freq = 440 * Math.pow(2, (n.pitch - 69) / 12);
+    const vibrato = ctx.createOscillator();
+    vibrato.frequency.value = 4.6;
+    const vibratoGain = ctx.createGain();
+    vibratoGain.gain.value = 9;
+    vibrato.connect(vibratoGain);
+    vibratoGain.connect(osc.detune);
+    vibratoGain.connect(osc2.detune);
 
-    // 簡易「歌声」風シンセ：サイン波 + 軽いビブラート + ローパスフィルタ
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 1500;
+    filter.Q.value = 1.2;
+
+    const oscGain = ctx.createGain();
+    oscGain.gain.value = 0.75;
+    const osc2Gain = ctx.createGain();
+    osc2Gain.gain.value = 0.35;
+
+    const gain = ctx.createGain();
+    const peak = Math.min(0.24, (n.velocity / 127) * 0.28);
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(peak, t0 + attack);
+    gain.gain.setValueAtTime(peak, Math.max(t0 + attack, t1 - release));
+    gain.gain.linearRampToValueAtTime(0, t1);
+
+    osc.connect(oscGain); oscGain.connect(filter);
+    osc2.connect(osc2Gain); osc2Gain.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(t0); osc.stop(t1 + 0.05);
+    osc2.start(t0); osc2.stop(t1 + 0.05);
+    vibrato.start(t0); vibrato.stop(t1 + 0.05);
+    nodes.push(osc, osc2, vibrato);
+
+  } else if (tone === 'whisper') {
+    // ウィスパー：サイン波の音量を大きく絞り、帯域を絞ったノイズ（息成分）を重ねて「囁き」感を出す。ビブラートなし。
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+
+    const toneFilter = ctx.createBiquadFilter();
+    toneFilter.type = 'lowpass';
+    toneFilter.frequency.value = 2200;
+
+    const toneGain = ctx.createGain();
+    toneGain.gain.value = 0.12; // 声の芯はごく薄く
+
+    const noiseSrc = ctx.createBufferSource();
+    noiseSrc.buffer = getNoiseBuffer(ctx);
+    noiseSrc.loop = true;
+
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.setValueAtTime(freq * 2, t0); // ピッチに追従させ、息のニュアンスを持たせる
+    noiseFilter.Q.value = 0.7;
+
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.value = 0.5; // 息成分を主役に
+
+    const gain = ctx.createGain();
+    const peak = Math.min(0.20, (n.velocity / 127) * 0.22);
+    const softAttack = Math.min(0.05, dur * 0.35);
+    const softRelease = Math.min(0.12, dur * 0.4);
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(peak, t0 + softAttack);
+    gain.gain.setValueAtTime(peak, Math.max(t0 + softAttack, t1 - softRelease));
+    gain.gain.linearRampToValueAtTime(0, t1);
+
+    osc.connect(toneFilter); toneFilter.connect(toneGain); toneGain.connect(gain);
+    noiseSrc.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(t0); osc.stop(t1 + 0.05);
+    noiseSrc.start(t0); noiseSrc.stop(t1 + 0.05);
+    nodes.push(osc, noiseSrc);
+
+  } else {
+    // オリジナル：サイン波 + 軽いビブラート + ローパスフィルタ
     const osc = ctx.createOscillator();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, t0);
@@ -1174,7 +1418,7 @@ function playNotes(notes) {
     const vibrato = ctx.createOscillator();
     vibrato.frequency.value = 5.4;
     const vibratoGain = ctx.createGain();
-    vibratoGain.gain.value = 6; // セント感の揺れ
+    vibratoGain.gain.value = 6;
     vibrato.connect(vibratoGain);
     vibratoGain.connect(osc.detune);
 
@@ -1184,8 +1428,6 @@ function playNotes(notes) {
 
     const gain = ctx.createGain();
     const peak = Math.min(0.28, (n.velocity / 127) * 0.32);
-    const attack = Math.min(0.02, dur * 0.25);
-    const release = Math.min(0.09, dur * 0.35);
     gain.gain.setValueAtTime(0, t0);
     gain.gain.linearRampToValueAtTime(peak, t0 + attack);
     gain.gain.setValueAtTime(peak, Math.max(t0 + attack, t1 - release));
@@ -1197,9 +1439,95 @@ function playNotes(notes) {
 
     osc.start(t0); osc.stop(t1 + 0.05);
     vibrato.start(t0); vibrato.stop(t1 + 0.05);
+    nodes.push(osc, vibrato);
+  }
 
-    state.activeNodes.push(osc, vibrato);
+  return nodes;
+}
+
+// コード伴奏用：柔らかいパッド音（トライアングル波+ローパス、ビブラートなし、控えめな音量）
+function buildPadVoiceForNote(ctx, n, t0, t1, dur) {
+  const freq = 440 * Math.pow(2, (n.pitch - 69) / 12);
+  const osc = ctx.createOscillator();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(freq, t0);
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 1800;
+
+  const gain = ctx.createGain();
+  const peak = Math.min(0.09, (n.velocity / 127) * 0.11);
+  const attack = Math.min(0.08, dur * 0.2);
+  const release = Math.min(0.15, dur * 0.3);
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(peak, t0 + attack);
+  gain.gain.setValueAtTime(peak, Math.max(t0 + attack, t1 - release));
+  gain.gain.linearRampToValueAtTime(0, t1);
+
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(t0); osc.stop(t1 + 0.05);
+  return [osc];
+}
+
+// エントリのコード進行から、小節ごとに持続するコードトーン群（伴奏ノート）を組み立てる
+function buildChordNotesForEntry(entry) {
+  if (!entry || !entry.progression) return [];
+  const scaleSteps = (SCALE_DEFS[entry.scaleId] || SCALE_DEFS.major).steps;
+  const keyOffset = entry.keyOffset || 0;
+  const chordNotes = [];
+  entry.progression.forEach((chordName, barIdx) => {
+    const degreeIndex = CHORD_DEGREE_INDEX[chordName] !== undefined ? CHORD_DEGREE_INDEX[chordName] : 0;
+    const tones = getChordTonesForDegree(scaleSteps, degreeIndex);
+    const startTick = barIdx * TICKS_PER_BAR;
+    tones.forEach(t => {
+      let pitch = MOD(t + keyOffset, 12) + 48; // C3付近のオクターブ帯に配置
+      while (pitch < 48) pitch += 12;
+      while (pitch > 59) pitch -= 12;
+      chordNotes.push({ startTick, durTicks: Math.max(1, TICKS_PER_BAR - 4), pitch, velocity: 55 });
+    });
   });
+  return chordNotes;
+}
+
+function playNotes(entry) {
+  stopPlayback();
+  if (!entry || !entry.notes || !entry.notes.length) return;
+  const notes = entry.notes;
+  const ctx = ensureAudioCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+  const myToken = ++state.playToken;
+  const tempo = entry.tempo || 120;
+  const secPerTick = 60 / (tempo * PPQ);
+  const startTime = ctx.currentTime + 0.08;
+  const tone = state.tone;
+  let maxEnd = 0;
+
+  notes.forEach(n => {
+    const t0 = startTime + n.startTick * secPerTick;
+    const dur = Math.max(0.03, n.durTicks * secPerTick);
+    const t1 = t0 + dur;
+    maxEnd = Math.max(maxEnd, t1);
+
+    const voiceNodes = buildVoiceForNote(ctx, n, t0, t1, dur, tone);
+    voiceNodes.forEach(node => state.activeNodes.push(node));
+  });
+
+  const chordToggle = document.getElementById('chord-playback-toggle');
+  if (chordToggle && chordToggle.checked) {
+    const chordNotes = buildChordNotesForEntry(entry);
+    chordNotes.forEach(n => {
+      const t0 = startTime + n.startTick * secPerTick;
+      const dur = Math.max(0.05, n.durTicks * secPerTick);
+      const t1 = t0 + dur;
+      maxEnd = Math.max(maxEnd, t1);
+      const padNodes = buildPadVoiceForNote(ctx, n, t0, t1, dur);
+      padNodes.forEach(node => state.activeNodes.push(node));
+    });
+  }
 
   state.isPlaying = true;
   updateTransportUI();
@@ -1341,7 +1669,11 @@ function initUI() {
 
   // ④ キー選択
   const keySel = document.getElementById('key-select');
-  keySel.innerHTML = KEY_NAMES.map((name, i) => '<option value="' + i + '">' + name + ' メジャー' + (i === 0 ? '（デフォルト）' : '') + '</option>').join('');
+  keySel.innerHTML = KEY_NAMES.map((name, i) => '<option value="' + i + '">' + name + (i === 0 ? '（デフォルト）' : '') + '</option>').join('');
+
+  // ④ スケール選択
+  const scaleSel = document.getElementById('scale-select');
+  scaleSel.innerHTML = SCALE_IDS.map(id => '<option value="' + id + '"' + (id === 'major' ? ' selected' : '') + '>' + SCALE_DEFS[id].ja + '</option>').join('');
 
   // ⑤ 固定コードプリセット
   const presetSel = document.getElementById('chord-preset');
@@ -1378,14 +1710,42 @@ function initUI() {
     slider.addEventListener('input', () => { valLabel.textContent = slider.value; });
   });
 
+  // ⑧ テンポスライダー
+  const tempoSlider = document.getElementById('tempo-slider');
+  const tempoVal = document.getElementById('tempo-slider-val');
+  tempoSlider.addEventListener('input', () => { tempoVal.textContent = tempoSlider.value; });
+
   // 生成数ラジオのlabel for属性は既にHTML側で対応済み
 
   // トランスポート
   document.getElementById('btn-play').addEventListener('click', () => {
     const entry = state.results[state.currentIndex];
-    if (entry) playNotes(entry.notes);
+    if (entry) playNotes(entry);
   });
   document.getElementById('btn-stop').addEventListener('click', stopPlayback);
+
+  // コード再生トグル：再生中に切り替えた場合は同じフレーズを再生し直す
+  document.getElementById('chord-playback-toggle').addEventListener('change', () => {
+    const entry = state.results[state.currentIndex];
+    if (state.isPlaying && entry) playNotes(entry);
+  });
+
+  // 音色セレクタ
+  const toneSelect = document.getElementById('tone-select');
+  toneSelect.value = state.tone;
+  toneSelect.addEventListener('change', () => {
+    state.tone = toneSelect.value;
+    // 再生中に音色を変更した場合は、同じフレーズを新しい音色で再生し直す
+    const entry = state.results[state.currentIndex];
+    if (state.isPlaying && entry) playNotes(entry);
+  });
+
+  // Aboutモーダル
+  const aboutModal = document.getElementById('about-modal');
+  document.getElementById('btn-about').addEventListener('click', () => { aboutModal.hidden = false; });
+  document.getElementById('btn-about-close').addEventListener('click', () => { aboutModal.hidden = true; });
+  aboutModal.addEventListener('click', (e) => { if (e.target === aboutModal) aboutModal.hidden = true; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !aboutModal.hidden) aboutModal.hidden = true; });
 
   document.getElementById('btn-generate').addEventListener('click', onGenerateClick);
   document.getElementById('btn-zip').addEventListener('click', onDownloadZip);
@@ -1413,6 +1773,7 @@ function collectSettings() {
   const phraseTypes = getCheckedValues('phrase');
   const styles = getCheckedValues('style');
   const keyOffset = parseInt(document.getElementById('key-select').value, 10);
+  const scaleId = document.getElementById('scale-select').value;
   const chordMode = document.querySelector('input[name="chord-mode"]:checked').value;
   const fixedProgression = CHORD_PRESETS[document.getElementById('chord-preset').value];
   const allowedChords = getCheckedValues('chord');
@@ -1426,8 +1787,9 @@ function collectSettings() {
   const seedFixed = document.getElementById('seed-fixed').checked;
   const seedValue = document.getElementById('seed-input').value;
   const count = parseInt(document.querySelector('input[name="batch-count"]:checked').value, 10);
+  const tempo = parseInt(document.getElementById('tempo-slider').value, 10);
 
-  return { bars, phraseTypes, styles, keyOffset, chordMode, fixedProgression, allowedChords, durationWeights, seedFixed, seedValue, count };
+  return { bars, phraseTypes, styles, keyOffset, scaleId, chordMode, fixedProgression, allowedChords, durationWeights, seedFixed, seedValue, count, tempo };
 }
 
 // ファイル名例: Verse_Cute_001.mid / Chorus_Power_245.mid
@@ -1438,10 +1800,11 @@ function buildFileName(phraseType, style, index, total) {
 
 function generatePhraseFile(params) {
   const rng = mulberry32(params.seed);
-  const cfg = Object.assign({}, params, { rng });
+  const scaleSteps = (SCALE_DEFS[params.scaleId] || SCALE_DEFS.major).steps;
+  const cfg = Object.assign({}, params, { rng, scaleSteps });
   const { notes, progression, structure } = generateMelody(cfg);
   const trackName = params.phraseType + '_' + params.style;
-  const midiBytes = buildMidiFile(notes, 120, trackName);
+  const midiBytes = buildMidiFile(notes, params.tempo || 120, trackName);
   return { notes, progression, structure, midiBytes };
 }
 
@@ -1483,17 +1846,20 @@ function onGenerateClick() {
       const result = generatePhraseFile({
         bars, phraseType, style,
         keyOffset: s.keyOffset,
+        scaleId: s.scaleId,
         chordMode: s.chordMode,
         fixedProgression: s.fixedProgression,
         allowedChords: s.allowedChords,
         durationWeights: s.durationWeights,
-        seed: melodySeed
+        seed: melodySeed,
+        tempo: s.tempo
       });
 
       const fileName = buildFileName(phraseType, style, i + 1, total);
       state.results.push({
         name: fileName, bars, phraseType, style,
-        notes: result.notes, midiBytes: result.midiBytes, progression: result.progression
+        notes: result.notes, midiBytes: result.midiBytes, progression: result.progression,
+        keyOffset: s.keyOffset, scaleId: s.scaleId, tempo: s.tempo
       });
     }
     statusEl.textContent = i + ' / ' + total + ' 曲 生成中…';
@@ -1552,7 +1918,7 @@ function renderResultsList() {
     btn.addEventListener('click', (e) => {
       const idx = Number(e.currentTarget.getAttribute('data-idx'));
       selectResult(idx);
-      playNotes(state.results[idx].notes);
+      playNotes(state.results[idx]);
     });
   });
   listEl.querySelectorAll('button[data-act="dl"]').forEach(btn => {
@@ -1574,11 +1940,15 @@ function selectResult(idx) {
 
   const tagsEl = document.getElementById('preview-tags');
   const progText = entry.progression.join(' - ');
+  const keyName = KEY_NAMES[entry.keyOffset || 0];
+  const scaleJa = (SCALE_DEFS[entry.scaleId] || SCALE_DEFS.major).ja;
   tagsEl.innerHTML =
     '<span class="tag accent">' + PHRASE_RANGE[entry.phraseType].ja + '</span>' +
     '<span class="tag accent2">' + STYLE_CONFIG[entry.style].ja + '</span>' +
     '<span class="tag">' + entry.bars + '小節</span>' +
+    '<span class="tag">' + keyName + ' ' + scaleJa + '</span>' +
     '<span class="tag">Chord: ' + progText + '</span>' +
+    '<span class="tag">Tempo: ' + (entry.tempo || 120) + '</span>' +
     '<span class="tag">Notes: ' + entry.notes.length + '</span>';
 
   redrawCurrentRoll(null);
